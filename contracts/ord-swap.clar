@@ -58,6 +58,7 @@
 (define-constant ERR_OFFER_MISMATCH (err u103))
 (define-constant ERR_OFFER_ACCEPTED (err u104))
 (define-constant ERR_OFFER_CANCELLED (err u105))
+(define-constant ERR_OFFER_REFUNDED (err u106))
 
 (define-public (create-offer
     (txid (buff 32))
@@ -153,6 +154,10 @@
     (asserts! (is-eq (map-get? offers-accepted-map offer-id) none)
       ERR_OFFER_ACCEPTED
     )
+    ;; Ensure it hasn't been refunded
+    (asserts! (is-eq (map-get? offers-refunded-map offer-id) none)
+      ERR_OFFER_REFUNDED
+    )
     ;; Ensure it wasn't cancelled
     (match (map-get? offers-cancelled-map offer-id)
       cancelled-at (if (<= burn-block-height cancelled-at)
@@ -228,7 +233,8 @@
       (cancelled (unwrap! (map-get? offers-cancelled-map id) ERR_INVALID_OFFER))
     )
     (asserts! (> burn-block-height cancelled) ERR_INVALID_OFFER)
-    (asserts! (map-insert offers-refunded-map id true) ERR_INVALID_OFFER)
+    (asserts! (is-eq (map-get? offers-refunded-map id) none) ERR_OFFER_REFUNDED)
+    (map-insert offers-refunded-map id true)
     (try! (as-contract? ((with-stx amount))
       (try! (stx-transfer? amount current-contract (get sender offer)))
     ))
@@ -255,7 +261,7 @@
 )
 
 (define-read-only (get-offer-refunded (id uint))
-  (map-get? offers-cancelled-map id)
+  (map-get? offers-refunded-map id)
 )
 
 (define-read-only (get-last-id)
